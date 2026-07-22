@@ -455,8 +455,6 @@
         <button class="btn" id="hideSync" type="button">닫기</button>
       </div>
       <div class="auth-grid">
-        <input class="field" id="supabaseUrl" type="url" autocomplete="off" placeholder="Supabase Project URL">
-        <input class="field" id="supabaseKey" type="password" autocomplete="off" placeholder="Supabase anon/public key">
         <input class="field" id="authEmail" type="email" autocomplete="email" placeholder="이메일">
         <input class="field" id="authPassword" type="password" autocomplete="current-password" placeholder="비밀번호">
       </div>
@@ -464,9 +462,8 @@
         <button class="btn primary" id="loginButton" type="button">로그인</button>
         <button class="btn" id="signupButton" type="button">가입</button>
         <button class="btn" id="logoutButton" type="button">로그아웃</button>
-        <button class="btn danger" id="resetCloudConfig" type="button">설정 지우기</button>
       </div>
-      <span class="auth-message" id="authMessage">Supabase 설정을 넣기 전까지는 이 브라우저에만 저장됩니다.</span>
+      <span class="auth-message" id="authMessage">이메일과 비밀번호로 로그인하면 모든 기기에서 같은 기록을 봅니다.</span>
     </section>
 
     <div class="layout">
@@ -510,7 +507,8 @@
 
   <script>
     const STORAGE_KEY = "tmemo-state-v4";
-    const SUPABASE_CONFIG_KEY = "tmemo-supabase-config-v1";
+    const SUPABASE_URL = "https://ogcjtkzojarkbbbfaoct.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nY2p0a3pvamFya2JiYmZhb2N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTY1NTgsImV4cCI6MjEwMDI5MjU1OH0.HcFcP-VLf-a7F3RddL7xvxi9S4t_DQOlVFf_uVnKOBg";
     let state = defaultState();
     let tickId = null;
     let syncId = null;
@@ -526,15 +524,12 @@
     const syncStatus = document.getElementById("syncStatus");
     const syncText = document.getElementById("syncText");
     const syncPanel = document.getElementById("syncPanel");
-    const supabaseUrl = document.getElementById("supabaseUrl");
-    const supabaseKey = document.getElementById("supabaseKey");
     const authEmail = document.getElementById("authEmail");
     const authPassword = document.getElementById("authPassword");
     const authMessage = document.getElementById("authMessage");
     const loginButton = document.getElementById("loginButton");
     const signupButton = document.getElementById("signupButton");
     const logoutButton = document.getElementById("logoutButton");
-    const resetCloudConfig = document.getElementById("resetCloudConfig");
     const hideSync = document.getElementById("hideSync");
     const toggleTimer = document.getElementById("toggleTimer");
     const completeTimer = document.getElementById("completeTimer");
@@ -584,18 +579,6 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
-    function loadCloudConfig() {
-      try {
-        return JSON.parse(localStorage.getItem(SUPABASE_CONFIG_KEY)) || null;
-      } catch {
-        return null;
-      }
-    }
-
-    function saveCloudConfig(config) {
-      localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
-    }
-
     function markUpdated() {
       state.updatedAt = new Date().toISOString();
     }
@@ -610,13 +593,10 @@
     }
 
     function ensureSupabaseClient() {
-      const config = loadCloudConfig();
-      if (!config || !config.url || !config.key || !window.supabase) return null;
+      if (!window.supabase) return null;
       if (!supabaseClient) {
-        supabaseClient = window.supabase.createClient(config.url, config.key);
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       }
-      supabaseUrl.value = config.url;
-      supabaseKey.value = config.key;
       return supabaseClient;
     }
 
@@ -648,17 +628,14 @@
     }
 
     async function signIn(mode) {
-      const url = supabaseUrl.value.trim();
-      const key = supabaseKey.value.trim();
       const email = authEmail.value.trim();
       const password = authPassword.value;
-      if (!url || !key || !email || !password) {
-        setAuthMessage("Supabase URL, anon key, 이메일, 비밀번호를 모두 입력해주세요.");
+      if (!email || !password) {
+        setAuthMessage("이메일과 비밀번호를 입력해주세요.");
         return;
       }
 
-      saveCloudConfig({ url, key });
-      supabaseClient = window.supabase.createClient(url, key);
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const authCall = mode === "signup"
         ? supabaseClient.auth.signUp({ email, password })
         : supabaseClient.auth.signInWithPassword({ email, password });
@@ -1045,17 +1022,6 @@
     signupButton.addEventListener("click", () => signIn("signup"));
     logoutButton.addEventListener("click", signOut);
     hideSync.addEventListener("click", () => syncPanel.classList.add("hidden"));
-    resetCloudConfig.addEventListener("click", () => {
-      localStorage.removeItem(SUPABASE_CONFIG_KEY);
-      supabaseClient = null;
-      currentUser = null;
-      stopRealtime();
-      window.clearInterval(syncId);
-      supabaseUrl.value = "";
-      supabaseKey.value = "";
-      setSyncStatus("offline", "로컬 저장 중");
-      setAuthMessage("Supabase 설정을 지웠습니다. 로컬 저장으로 계속 사용할 수 있습니다.");
-    });
 
     if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
       navigator.serviceWorker.register("sw.js");
@@ -1065,11 +1031,6 @@
     renderAll();
 
     window.addEventListener("load", () => {
-      const config = loadCloudConfig();
-      if (config) {
-        supabaseUrl.value = config.url || "";
-        supabaseKey.value = config.key || "";
-      }
       initializeSupabase();
     });
   </script>
