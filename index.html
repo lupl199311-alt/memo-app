@@ -461,6 +461,7 @@
       <div class="auth-actions">
         <button class="btn primary" id="loginButton" type="button">로그인</button>
         <button class="btn" id="signupButton" type="button">가입</button>
+        <button class="btn" id="resendButton" type="button">인증 메일 다시 보내기</button>
         <button class="btn" id="logoutButton" type="button">로그아웃</button>
       </div>
       <span class="auth-message" id="authMessage">이메일과 비밀번호로 로그인하면 모든 기기에서 같은 기록을 봅니다.</span>
@@ -529,6 +530,7 @@
     const authMessage = document.getElementById("authMessage");
     const loginButton = document.getElementById("loginButton");
     const signupButton = document.getElementById("signupButton");
+    const resendButton = document.getElementById("resendButton");
     const logoutButton = document.getElementById("logoutButton");
     const hideSync = document.getElementById("hideSync");
     const toggleTimer = document.getElementById("toggleTimer");
@@ -592,6 +594,10 @@
       authMessage.textContent = text;
     }
 
+    function getAuthRedirectUrl() {
+      return `${location.origin}${location.pathname}`;
+    }
+
     function ensureSupabaseClient() {
       if (!window.supabase) return null;
       if (!supabaseClient) {
@@ -611,11 +617,11 @@
         const { data, error } = await client.auth.getSession();
         if (error) throw error;
         currentUser = data.session?.user || null;
-        if (!currentUser) {
-          setSyncStatus("offline", "로그인 필요");
-          setAuthMessage("Supabase 설정은 저장됐고, 로그인하면 동기화가 시작됩니다.");
-          return;
-        }
+      if (!currentUser) {
+        setSyncStatus("offline", "로그인 필요");
+        setAuthMessage("가입한 이메일을 확인한 뒤 로그인하면 동기화가 시작됩니다.");
+        return;
+      }
         authEmail.value = currentUser.email || "";
         syncPanel.classList.add("hidden");
         await loadCloudState();
@@ -637,12 +643,18 @@
 
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const authCall = mode === "signup"
-        ? supabaseClient.auth.signUp({ email, password })
+        ? supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: getAuthRedirectUrl() }
+          })
         : supabaseClient.auth.signInWithPassword({ email, password });
       const { data, error } = await authCall;
       if (error) {
         setSyncStatus("error", "로그인 실패");
-        setAuthMessage(error.message);
+        setAuthMessage(error.message === "Email not confirmed"
+          ? "이메일 인증이 아직 안 됐어요. 메일함에서 확인하거나 인증 메일을 다시 보내주세요."
+          : error.message);
         return;
       }
 
@@ -668,6 +680,31 @@
       syncPanel.classList.remove("hidden");
       setSyncStatus("offline", "로그아웃됨");
       setAuthMessage("로그아웃 후에도 이 브라우저에는 마지막 데이터가 남아 있습니다.");
+    }
+
+    async function resendConfirmationEmail() {
+      const email = authEmail.value.trim();
+      if (!email) {
+        setAuthMessage("인증 메일을 받을 이메일을 입력해주세요.");
+        return;
+      }
+      const client = ensureSupabaseClient();
+      if (!client) {
+        setAuthMessage("Supabase 연결을 확인해주세요.");
+        return;
+      }
+      const { error } = await client.auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: getAuthRedirectUrl() }
+      });
+      if (error) {
+        setSyncStatus("error", "인증 메일 발송 실패");
+        setAuthMessage(error.message);
+        return;
+      }
+      setSyncStatus("offline", "이메일 확인 필요");
+      setAuthMessage(`${email}로 인증 메일을 다시 보냈어요. 받은 편지함과 스팸함을 확인해주세요.`);
     }
 
     async function loadCloudState() {
@@ -1020,6 +1057,7 @@
 
     loginButton.addEventListener("click", () => signIn("login"));
     signupButton.addEventListener("click", () => signIn("signup"));
+    resendButton.addEventListener("click", resendConfirmationEmail);
     logoutButton.addEventListener("click", signOut);
     hideSync.addEventListener("click", () => syncPanel.classList.add("hidden"));
 
