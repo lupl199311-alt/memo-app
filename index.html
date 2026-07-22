@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#3182f6">
+  <meta name="description" content="할일 집중 타이머와 스티커 메모를 Supabase로 동기화하는 가벼운 웹앱">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>티메모</title>
+  <style>
+    :root {
+      --blue: #3182f6;
+      --blue-pressed: #1b64da;
+      --grey-50: #f9fafb;
+      --grey-100: #f2f4f6;
+      --grey-200: #e5e8eb;
+      --grey-300: #d1d6db;
+      --grey-500: #8b95a1;
+      --grey-600: #6b7684;
+      --grey-800: #333d4b;
+      --grey-900: #191f28;
+      --yellow: #fff8d8;
+      --yellow-line: #f1dc7d;
+      --green: #00c471;
+      --red: #f04452;
+      --surface: rgba(255, 255, 255, 0.9);
+      color-scheme: light;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(49, 130, 246, 0.09), transparent 28rem),
+        linear-gradient(180deg, #ffffff 0%, var(--grey-50) 100%);
+      color: var(--grey-900);
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+
+    button, input, textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      width: min(1040px, 100%);
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: 12px 0 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.78));
+      backdrop-filter: blur(18px);
+    }
+
+    .timer-panel, .section, .sync-panel {
+      border: 1px solid var(--grey-200);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .timer-panel {
+      display: grid;
+      gap: 16px;
+      align-items: center;
+      padding: 18px;
+      text-align: center;
+      box-shadow: 0 18px 42px rgba(25, 31, 40, 0.08);
+    }
+
+    .timer-label {
+      margin: 0 0 4px;
+      color: var(--grey-600);
+      font-size: 13px;
+    }
+
+    .timer-time {
+      margin: 0;
+      font-size: clamp(36px, 8vw, 72px);
+      line-height: 1;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--grey-900);
+    }
+
+    .timer-controls, .memo-actions, .auth-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .active-task {
+      display: none;
+      width: min(560px, 100%);
+      margin: 14px auto 0;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--grey-50);
+      color: var(--grey-800);
+      text-align: left;
+    }
+
+    .active-task.visible {
+      display: block;
+    }
+
+    .active-task-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--grey-600);
+      font-size: 12px;
+    }
+
+    .active-task-text {
+      overflow-wrap: anywhere;
+      font-weight: 500;
+    }
+
+    .btn {
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 8px;
+      background: var(--grey-100);
+      color: var(--grey-800);
+      font-weight: 500;
+      transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .btn:hover {
+      background: var(--grey-200);
+    }
+
+    .btn:disabled, .icon-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn.primary {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .btn.primary:hover {
+      background: var(--blue-pressed);
+    }
+
+    .btn.danger {
+      color: var(--red);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+      margin-top: 8px;
+    }
+
+    .section, .sync-panel {
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .sync-panel {
+      display: grid;
+      gap: 12px;
+      margin: 0 0 18px;
+    }
+
+    .sync-panel.hidden {
+      display: none;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    h1, h2 {
+      margin: 0;
+      font-weight: 500;
+      letter-spacing: 0;
+      color: var(--grey-900);
+    }
+
+    h1 {
+      font-size: 22px;
+    }
+
+    h2 {
+      font-size: 18px;
+    }
+
+    .muted, .sync-status, .auth-message {
+      color: var(--grey-600);
+      font-size: 13px;
+    }
+
+    .sync-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .sync-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .sync-status.offline .sync-dot {
+      background: var(--grey-300);
+    }
+
+    .sync-status.error .sync-dot {
+      background: var(--red);
+    }
+
+    .todo-form, .auth-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .auth-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-bottom: 0;
+    }
+
+    .field, .memo-box {
+      width: 100%;
+      border: 1px solid var(--grey-200);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--grey-900);
+      outline: none;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    .field {
+      min-height: 46px;
+      padding: 0 14px;
+    }
+
+    .memo-box {
+      min-height: 164px;
+      padding: 14px;
+      resize: vertical;
+      background: linear-gradient(180deg, var(--yellow), #fffdf0);
+      border-color: var(--yellow-line);
+      box-shadow: inset 0 -1px 0 rgba(241, 220, 125, 0.55);
+    }
+
+    .field:focus, .memo-box:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.16);
+    }
+
+    .todo-list, .memo-log {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .todo-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 48px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--grey-50);
+    }
+
+    .todo-item.active {
+      background: #fff;
+      box-shadow: inset 0 0 0 1px rgba(49, 130, 246, 0.38);
+    }
+
+    .todo-item input {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--blue);
+    }
+
+    .todo-text {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--grey-800);
+    }
+
+    .todo-item.done .todo-text {
+      color: var(--grey-500);
+      text-decoration: line-through;
+    }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--grey-500);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+
+    .icon-btn:hover {
+      background: var(--grey-100);
+      color: var(--grey-800);
+    }
+
+    .focus-btn {
+      color: var(--blue);
+    }
+
+    .memo-actions {
+      justify-content: flex-end;
+      margin-top: 10px;
+      margin-bottom: 18px;
+    }
+
+    .memo-item {
+      padding: 14px;
+      border-radius: 8px;
+      background: var(--yellow);
+      border: 1px solid rgba(241, 220, 125, 0.75);
+    }
+
+    .memo-item p {
+      margin: 8px 0 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: var(--grey-800);
+    }
+
+    .memo-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--grey-600);
+      font-size: 12px;
+    }
+
+    .empty {
+      padding: 28px 12px;
+      border: 1px dashed var(--grey-300);
+      border-radius: 8px;
+      color: var(--grey-500);
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .progress {
+      width: 100%;
+      height: 8px;
+      margin-top: 14px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--grey-100);
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: var(--green);
+      transition: width 180ms ease;
+    }
+
+    @media (max-width: 780px) {
+      .app {
+        padding: 12px;
+      }
+
+      .timer-panel, .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .timer-controls {
+        justify-content: stretch;
+      }
+
+      .timer-controls .btn {
+        flex: 1 1 88px;
+      }
+
+      .todo-form, .auth-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar" aria-label="타이머">
+      <section class="timer-panel">
+        <div>
+          <p class="timer-label">오늘 집중 시간</p>
+          <p class="timer-time" id="timer">00:00:00</p>
+          <div class="active-task" id="activeTask">
+            <span class="active-task-label">지금 할 일</span>
+            <div class="active-task-text" id="activeTaskText"></div>
+          </div>
+          <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+          <span class="sync-status offline" id="syncStatus"><span class="sync-dot"></span><span id="syncText">로컬 저장 중</span></span>
+        </div>
+        <div class="timer-controls" aria-label="타이머 조작">
+          <button class="btn primary" id="toggleTimer" type="button">시작</button>
+          <button class="btn" id="completeTimer" type="button">완료</button>
+          <button class="btn danger" id="resetTimer" type="button">초기화</button>
+        </div>
+      </section>
+    </header>
+
+    <section class="sync-panel" id="syncPanel" aria-labelledby="syncTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="syncTitle">Supabase 동기화</h2>
+          <span class="muted">로그인하면 모든 기기에서 같은 기록을 봅니다.</span>
+        </div>
+        <button class="btn" id="hideSync" type="button">닫기</button>
+      </div>
+      <div class="auth-grid">
+        <input class="field" id="supabaseUrl" type="url" autocomplete="off" placeholder="Supabase Project URL">
+        <input class="field" id="supabaseKey" type="password" autocomplete="off" placeholder="Supabase anon/public key">
+        <input class="field" id="authEmail" type="email" autocomplete="email" placeholder="이메일">
+        <input class="field" id="authPassword" type="password" autocomplete="current-password" placeholder="비밀번호">
+      </div>
+      <div class="auth-actions">
+        <button class="btn primary" id="loginButton" type="button">로그인</button>
+        <button class="btn" id="signupButton" type="button">가입</button>
+        <button class="btn" id="logoutButton" type="button">로그아웃</button>
+        <button class="btn danger" id="resetCloudConfig" type="button">설정 지우기</button>
+      </div>
+      <span class="auth-message" id="authMessage">Supabase 설정을 넣기 전까지는 이 브라우저에만 저장됩니다.</span>
+    </section>
+
+    <div class="layout">
+      <section class="section" aria-labelledby="todoTitle">
+        <div class="section-head">
+          <div>
+            <h1 id="todoTitle">할일</h1>
+            <span class="muted" id="todoCount">0개 남음</span>
+          </div>
+          <button class="btn" id="clearDone" type="button">완료 정리</button>
+        </div>
+
+        <form class="todo-form" id="todoForm">
+          <input class="field" id="todoInput" type="text" autocomplete="off" placeholder="할일을 적어주세요">
+          <button class="btn primary" type="submit">추가</button>
+        </form>
+
+        <ul class="todo-list" id="todoList"></ul>
+        <div class="empty" id="todoEmpty">체크할 일이 아직 없어요.</div>
+      </section>
+
+      <section class="section" aria-labelledby="memoTitle">
+        <div class="section-head">
+          <div>
+            <h2 id="memoTitle">스티커 메모</h2>
+            <span class="muted">적으면 아래에 기록돼요</span>
+          </div>
+        </div>
+
+        <textarea class="memo-box" id="memoInput" placeholder="지금 떠오른 생각, 작업 메모, 회의 중 한 줄..."></textarea>
+        <div class="memo-actions">
+          <button class="btn" id="clearMemo" type="button">비우기</button>
+          <button class="btn primary" id="saveMemo" type="button">저장</button>
+        </div>
+
+        <ul class="memo-log" id="memoLog"></ul>
+        <div class="empty" id="memoEmpty">아직 남긴 메모가 없어요.</div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "tmemo-state-v4";
+    const SUPABASE_CONFIG_KEY = "tmemo-supabase-config-v1";
+    let state = defaultState();
+    let tickId = null;
+    let syncId = null;
+    let cloudChannel = null;
+    let isSaving = false;
+    let supabaseClient = null;
+    let currentUser = null;
+
+    const timerEl = document.getElementById("timer");
+    const progressBar = document.getElementById("progressBar");
+    const activeTask = document.getElementById("activeTask");
+    const activeTaskText = document.getElementById("activeTaskText");
+    const syncStatus = document.getElementById("syncStatus");
+    const syncText = document.getElementById("syncText");
+    const syncPanel = document.getElementById("syncPanel");
+    const supabaseUrl = document.getElementById("supabaseUrl");
+    const supabaseKey = document.getElementById("supabaseKey");
+    const authEmail = document.getElementById("authEmail");
+    const authPassword = document.getElementById("authPassword");
+    const authMessage = document.getElementById("authMessage");
+    const loginButton = document.getElementById("loginButton");
+    const signupButton = document.getElementById("signupButton");
+    const logoutButton = document.getElementById("logoutButton");
+    const resetCloudConfig = document.getElementById("resetCloudConfig");
+    const hideSync = document.getElementById("hideSync");
+    const toggleTimer = document.getElementById("toggleTimer");
+    const completeTimer = document.getElementById("completeTimer");
+    const resetTimer = document.getElementById("resetTimer");
+    const todoForm = document.getElementById("todoForm");
+    const todoInput = document.getElementById("todoInput");
+    const todoList = document.getElementById("todoList");
+    const todoEmpty = document.getElementById("todoEmpty");
+    const todoCount = document.getElementById("todoCount");
+    const clearDone = document.getElementById("clearDone");
+    const memoInput = document.getElementById("memoInput");
+    const saveMemo = document.getElementById("saveMemo");
+    const clearMemo = document.getElementById("clearMemo");
+    const memoLog = document.getElementById("memoLog");
+    const memoEmpty = document.getElementById("memoEmpty");
+
+    function defaultState() {
+      return {
+        todos: [],
+        memos: [],
+        elapsedMs: 0,
+        runningSince: null,
+        activeTodoId: null,
+        updatedAt: ""
+      };
+    }
+
+    function normalizeState(nextState) {
+      const incoming = nextState && typeof nextState === "object" ? nextState : defaultState();
+      return {
+        ...defaultState(),
+        ...incoming,
+        todos: Array.isArray(incoming.todos) ? incoming.todos : [],
+        memos: Array.isArray(incoming.memos) ? incoming.memos : []
+      };
+    }
+
+    function loadLocalState() {
+      try {
+        return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultState());
+      } catch {
+        return defaultState();
+      }
+    }
+
+    function saveLocalState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function loadCloudConfig() {
+      try {
+        return JSON.parse(localStorage.getItem(SUPABASE_CONFIG_KEY)) || null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveCloudConfig(config) {
+      localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+    }
+
+    function markUpdated() {
+      state.updatedAt = new Date().toISOString();
+    }
+
+    function setSyncStatus(kind, text) {
+      syncStatus.className = `sync-status ${kind}`;
+      syncText.textContent = text;
+    }
+
+    function setAuthMessage(text) {
+      authMessage.textContent = text;
+    }
+
+    function ensureSupabaseClient() {
+      const config = loadCloudConfig();
+      if (!config || !config.url || !config.key || !window.supabase) return null;
+      if (!supabaseClient) {
+        supabaseClient = window.supabase.createClient(config.url, config.key);
+      }
+      supabaseUrl.value = config.url;
+      supabaseKey.value = config.key;
+      return supabaseClient;
+    }
+
+    async function initializeSupabase() {
+      const client = ensureSupabaseClient();
+      if (!client) {
+        setSyncStatus("offline", "로컬 저장 중");
+        return;
+      }
+
+      try {
+        const { data, error } = await client.auth.getSession();
+        if (error) throw error;
+        currentUser = data.session?.user || null;
+        if (!currentUser) {
+          setSyncStatus("offline", "로그인 필요");
+          setAuthMessage("Supabase 설정은 저장됐고, 로그인하면 동기화가 시작됩니다.");
+          return;
+        }
+        authEmail.value = currentUser.email || "";
+        syncPanel.classList.add("hidden");
+        await loadCloudState();
+        startCloudSyncing();
+        startRealtime();
+      } catch (error) {
+        setSyncStatus("error", "Supabase 연결 실패");
+        setAuthMessage(error.message || "Supabase 연결을 확인해주세요.");
+      }
+    }
+
+    async function signIn(mode) {
+      const url = supabaseUrl.value.trim();
+      const key = supabaseKey.value.trim();
+      const email = authEmail.value.trim();
+      const password = authPassword.value;
+      if (!url || !key || !email || !password) {
+        setAuthMessage("Supabase URL, anon key, 이메일, 비밀번호를 모두 입력해주세요.");
+        return;
+      }
+
+      saveCloudConfig({ url, key });
+      supabaseClient = window.supabase.createClient(url, key);
+      const authCall = mode === "signup"
+        ? supabaseClient.auth.signUp({ email, password })
+        : supabaseClient.auth.signInWithPassword({ email, password });
+      const { data, error } = await authCall;
+      if (error) {
+        setSyncStatus("error", "로그인 실패");
+        setAuthMessage(error.message);
+        return;
+      }
+
+      currentUser = data.user || data.session?.user || null;
+      if (!currentUser) {
+        setSyncStatus("offline", "이메일 확인 필요");
+        setAuthMessage("가입 메일을 확인한 뒤 로그인해주세요.");
+        return;
+      }
+
+      authPassword.value = "";
+      syncPanel.classList.add("hidden");
+      await loadCloudState();
+      startCloudSyncing();
+      startRealtime();
+    }
+
+    async function signOut() {
+      if (supabaseClient) await supabaseClient.auth.signOut();
+      currentUser = null;
+      stopRealtime();
+      window.clearInterval(syncId);
+      syncPanel.classList.remove("hidden");
+      setSyncStatus("offline", "로그아웃됨");
+      setAuthMessage("로그아웃 후에도 이 브라우저에는 마지막 데이터가 남아 있습니다.");
+    }
+
+    async function loadCloudState() {
+      if (!supabaseClient || !currentUser) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from("tmemo_states")
+          .select("state, updated_at")
+          .eq("user_id", currentUser.id)
+          .maybeSingle();
+        if (error) throw error;
+
+        const local = loadLocalState();
+        const cloud = data?.state ? normalizeState(data.state) : null;
+        if (cloud && (cloud.updatedAt || "") >= (local.updatedAt || "")) {
+          state = cloud;
+          saveLocalState();
+          renderAll();
+        } else {
+          state = local;
+          await pushState();
+        }
+        setSyncStatus("", "Supabase 동기화됨");
+        setAuthMessage(`${currentUser.email} 계정으로 동기화 중입니다.`);
+      } catch (error) {
+        setSyncStatus("error", "Supabase 저장 확인 필요");
+        setAuthMessage(error.message || "Supabase 테이블/RLS 설정을 확인해주세요.");
+      }
+    }
+
+    async function persistState() {
+      markUpdated();
+      await pushState();
+    }
+
+    async function pushState() {
+      saveLocalState();
+      if (!supabaseClient || !currentUser) {
+        setSyncStatus("offline", "로컬 저장 중");
+        return;
+      }
+
+      try {
+        isSaving = true;
+        const { error } = await supabaseClient
+          .from("tmemo_states")
+          .upsert({
+            user_id: currentUser.id,
+            state,
+            updated_at: state.updatedAt || new Date().toISOString()
+          }, { onConflict: "user_id" });
+        if (error) throw error;
+        setSyncStatus("", "Supabase 동기화됨");
+      } catch (error) {
+        setSyncStatus("error", "Supabase 재시도 중");
+        setAuthMessage(error.message || "저장은 이 브라우저에 보관했고, 연결되면 다시 올립니다.");
+      } finally {
+        isSaving = false;
+      }
+    }
+
+    async function pullUpdates() {
+      if (isSaving || !supabaseClient || !currentUser) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from("tmemo_states")
+          .select("state")
+          .eq("user_id", currentUser.id)
+          .maybeSingle();
+        if (error) throw error;
+        const cloud = data?.state ? normalizeState(data.state) : null;
+        if (cloud && (cloud.updatedAt || "") > (state.updatedAt || "")) {
+          state = cloud;
+          saveLocalState();
+          renderAll();
+        } else if ((state.updatedAt || "") > (cloud?.updatedAt || "")) {
+          await pushState();
+        }
+        setSyncStatus("", "Supabase 동기화됨");
+      } catch {
+        setSyncStatus("error", "Supabase 재시도 중");
+      }
+    }
+
+    function startCloudSyncing() {
+      window.clearInterval(syncId);
+      syncId = window.setInterval(pullUpdates, 2200);
+    }
+
+    function startRealtime() {
+      stopRealtime();
+      if (!supabaseClient || !currentUser) return;
+      cloudChannel = supabaseClient
+        .channel("tmemo-state")
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "tmemo_states",
+          filter: `user_id=eq.${currentUser.id}`
+        }, (payload) => {
+          const cloud = normalizeState(payload.new?.state);
+          if ((cloud.updatedAt || "") > (state.updatedAt || "")) {
+            state = cloud;
+            saveLocalState();
+            renderAll();
+          }
+        })
+        .subscribe();
+    }
+
+    function stopRealtime() {
+      if (cloudChannel && supabaseClient) {
+        supabaseClient.removeChannel(cloudChannel);
+      }
+      cloudChannel = null;
+    }
+
+    function nowElapsed() {
+      if (!state.runningSince) return state.elapsedMs;
+      return state.elapsedMs + Date.now() - state.runningSince;
+    }
+
+    function formatTime(ms) {
+      const total = Math.floor(ms / 1000);
+      const hours = String(Math.floor(total / 3600)).padStart(2, "0");
+      const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
+      const seconds = String(total % 60).padStart(2, "0");
+      return `${hours}:${minutes}:${seconds}`;
+    }
+
+    function formatDate(iso) {
+      return new Intl.DateTimeFormat("ko-KR", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(new Date(iso));
+    }
+
+    function updateTimer() {
+      const elapsed = nowElapsed();
+      const activeTodo = getActiveTodo();
+      timerEl.textContent = formatTime(elapsed);
+      progressBar.style.width = `${Math.min(100, elapsed / 900000 * 100)}%`;
+      toggleTimer.textContent = state.runningSince ? "멈춤" : "시작";
+      toggleTimer.disabled = !activeTodo;
+      completeTimer.disabled = !activeTodo;
+      activeTask.classList.toggle("visible", Boolean(activeTodo));
+      activeTaskText.textContent = activeTodo ? activeTodo.text : "";
+    }
+
+    function startTicking() {
+      window.clearInterval(tickId);
+      if (state.runningSince) tickId = window.setInterval(updateTimer, 250);
+      updateTimer();
+    }
+
+    function renderTodos() {
+      todoList.innerHTML = "";
+      state.todos.forEach((todo) => {
+        const li = document.createElement("li");
+        li.className = `todo-item${todo.done ? " done" : ""}${todo.id === state.activeTodoId ? " active" : ""}`;
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = todo.done;
+        checkbox.ariaLabel = `${todo.text} 완료`;
+        checkbox.addEventListener("change", () => {
+          todo.done = checkbox.checked;
+          if (todo.done && todo.id === state.activeTodoId) {
+            state.activeTodoId = null;
+            state.elapsedMs = 0;
+            state.runningSince = null;
+          }
+          persistState();
+          renderAll();
+        });
+
+        const text = document.createElement("span");
+        text.className = "todo-text";
+        text.textContent = todo.text;
+
+        const focus = document.createElement("button");
+        focus.type = "button";
+        focus.className = "icon-btn focus-btn";
+        focus.ariaLabel = `${todo.text} 타이머 시작`;
+        focus.textContent = "↑";
+        focus.disabled = todo.done;
+        focus.addEventListener("click", () => startTodoTimer(todo.id));
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "icon-btn";
+        remove.ariaLabel = `${todo.text} 삭제`;
+        remove.textContent = "×";
+        remove.addEventListener("click", () => {
+          state.todos = state.todos.filter((item) => item.id !== todo.id);
+          if (state.activeTodoId === todo.id) {
+            state.activeTodoId = null;
+            state.elapsedMs = 0;
+            state.runningSince = null;
+          }
+          persistState();
+          renderAll();
+        });
+
+        li.append(checkbox, text, focus, remove);
+        todoList.append(li);
+      });
+
+      const left = state.todos.filter((todo) => !todo.done).length;
+      todoCount.textContent = `${left}개 남음`;
+      todoEmpty.hidden = state.todos.length > 0;
+      clearDone.disabled = !state.todos.some((todo) => todo.done);
+    }
+
+    function renderMemos() {
+      memoLog.innerHTML = "";
+      state.memos.forEach((memo) => {
+        const li = document.createElement("li");
+        li.className = "memo-item";
+
+        const meta = document.createElement("div");
+        meta.className = "memo-meta";
+
+        const time = document.createElement("span");
+        time.textContent = formatDate(memo.createdAt);
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "icon-btn";
+        remove.ariaLabel = "메모 삭제";
+        remove.textContent = "×";
+        remove.addEventListener("click", () => {
+          state.memos = state.memos.filter((item) => item.id !== memo.id);
+          persistState();
+          renderMemos();
+        });
+
+        const body = document.createElement("p");
+        body.textContent = memo.text;
+
+        meta.append(time, remove);
+        li.append(meta, body);
+        memoLog.append(li);
+      });
+
+      memoEmpty.hidden = state.memos.length > 0;
+    }
+
+    function renderAll() {
+      renderTodos();
+      renderMemos();
+      startTicking();
+    }
+
+    function getActiveTodo() {
+      return state.todos.find((todo) => todo.id === state.activeTodoId && !todo.done) || null;
+    }
+
+    function startTodoTimer(todoId) {
+      const todo = state.todos.find((item) => item.id === todoId && !item.done);
+      if (!todo) return;
+      state.activeTodoId = todo.id;
+      state.elapsedMs = 0;
+      state.runningSince = Date.now();
+      persistState();
+      renderAll();
+    }
+
+    function addMemo(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      state.memos.unshift({
+        id: crypto.randomUUID(),
+        text: trimmed,
+        createdAt: new Date().toISOString()
+      });
+      memoInput.value = "";
+      persistState();
+      renderMemos();
+    }
+
+    toggleTimer.addEventListener("click", () => {
+      if (!getActiveTodo()) return;
+      if (state.runningSince) {
+        state.elapsedMs = nowElapsed();
+        state.runningSince = null;
+      } else {
+        state.runningSince = Date.now();
+      }
+      persistState();
+      startTicking();
+    });
+
+    completeTimer.addEventListener("click", () => {
+      const activeTodo = getActiveTodo();
+      if (!activeTodo) return;
+      activeTodo.done = true;
+      state.memos.unshift({
+        id: crypto.randomUUID(),
+        text: `${activeTodo.text} 완료 (${formatTime(nowElapsed())})`,
+        createdAt: new Date().toISOString()
+      });
+      state.activeTodoId = null;
+      state.elapsedMs = 0;
+      state.runningSince = null;
+      persistState();
+      renderAll();
+    });
+
+    resetTimer.addEventListener("click", () => {
+      state.elapsedMs = 0;
+      state.runningSince = null;
+      persistState();
+      startTicking();
+    });
+
+    todoForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = todoInput.value.trim();
+      if (!text) return;
+      state.todos.unshift({
+        id: crypto.randomUUID(),
+        text,
+        done: false
+      });
+      todoInput.value = "";
+      persistState();
+      renderTodos();
+    });
+
+    clearDone.addEventListener("click", () => {
+      state.todos = state.todos.filter((todo) => !todo.done);
+      persistState();
+      renderTodos();
+    });
+
+    saveMemo.addEventListener("click", () => addMemo(memoInput.value));
+    clearMemo.addEventListener("click", () => {
+      memoInput.value = "";
+      memoInput.focus();
+    });
+
+    memoInput.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        addMemo(memoInput.value);
+      }
+    });
+
+    loginButton.addEventListener("click", () => signIn("login"));
+    signupButton.addEventListener("click", () => signIn("signup"));
+    logoutButton.addEventListener("click", signOut);
+    hideSync.addEventListener("click", () => syncPanel.classList.add("hidden"));
+    resetCloudConfig.addEventListener("click", () => {
+      localStorage.removeItem(SUPABASE_CONFIG_KEY);
+      supabaseClient = null;
+      currentUser = null;
+      stopRealtime();
+      window.clearInterval(syncId);
+      supabaseUrl.value = "";
+      supabaseKey.value = "";
+      setSyncStatus("offline", "로컬 저장 중");
+      setAuthMessage("Supabase 설정을 지웠습니다. 로컬 저장으로 계속 사용할 수 있습니다.");
+    });
+
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+      navigator.serviceWorker.register("sw.js");
+    }
+
+    state = loadLocalState();
+    renderAll();
+
+    window.addEventListener("load", () => {
+      const config = loadCloudConfig();
+      if (config) {
+        supabaseUrl.value = config.url || "";
+        supabaseKey.value = config.key || "";
+      }
+      initializeSupabase();
+    });
+  </script>
+</body>
+</html>

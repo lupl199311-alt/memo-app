@@ -1,0 +1,17 @@
+{
+  "name": "티메모",
+  "short_name": "티메모",
+  "description": "할일 집중 타이머와 스티커 메모를 Supabase로 동기화하는 가벼운 웹앱",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#3182f6",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
