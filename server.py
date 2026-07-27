@@ -14,5 +14,5 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 4177
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
-    print(f"Tmemo dev server: http://localhost:{port}/")
+    print(f"luplmemo dev server: http://localhost:{port}/")
     server.serve_forever()

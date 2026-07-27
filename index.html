@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <title>티메모</title>
+  <title>luplmemo</title>
   <style>
     :root {
       --blue: #3182f6;
@@ -255,7 +255,7 @@
       margin-bottom: 0;
     }
 
-    .field, .memo-box {
+    .field, .todo-box, .memo-box {
       width: 100%;
       border: 1px solid var(--grey-200);
       border-radius: 8px;
@@ -270,6 +270,13 @@
       padding: 0 14px;
     }
 
+    .todo-box {
+      min-height: 72px;
+      padding: 12px 14px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
     .memo-box {
       min-height: 164px;
       padding: 14px;
@@ -279,7 +286,7 @@
       box-shadow: inset 0 -1px 0 rgba(241, 220, 125, 0.55);
     }
 
-    .field:focus, .memo-box:focus {
+    .field:focus, .todo-box:focus, .memo-box:focus {
       border-color: var(--blue);
       box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.16);
     }
@@ -478,7 +485,7 @@
         </div>
 
         <form class="todo-form" id="todoForm">
-          <input class="field" id="todoInput" type="text" autocomplete="off" placeholder="할일을 적어주세요">
+          <textarea class="todo-box" id="todoInput" autocomplete="off" placeholder="할일을 한 줄에 하나씩 적어주세요"></textarea>
           <button class="btn primary" type="submit">추가</button>
         </form>
 
@@ -975,6 +982,26 @@
       renderAll();
     }
 
+    function parseTodoInput(text) {
+      return text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    }
+
+    function addTodos(text) {
+      const items = parseTodoInput(text);
+      if (items.length === 0) return;
+      state.todos.unshift(...items.map((item) => ({
+        id: crypto.randomUUID(),
+        text: item,
+        done: false
+      })));
+      todoInput.value = "";
+      persistState();
+      renderTodos();
+    }
+
     function addMemo(text) {
       const trimmed = text.trim();
       if (!trimmed) return;
@@ -1025,16 +1052,14 @@
 
     todoForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      const text = todoInput.value.trim();
-      if (!text) return;
-      state.todos.unshift({
-        id: crypto.randomUUID(),
-        text,
-        done: false
-      });
-      todoInput.value = "";
-      persistState();
-      renderTodos();
+      addTodos(todoInput.value);
+    });
+
+    todoInput.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        addTodos(todoInput.value);
+      }
     });
 
     clearDone.addEventListener("click", () => {

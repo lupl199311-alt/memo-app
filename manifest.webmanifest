@@ -1,6 +1,6 @@
 {
-  "name": "티메모",
-  "short_name": "티메모",
+  "name": "luplmemo",
+  "short_name": "luplmemo",
   "description": "할일 집중 타이머와 스티커 메모를 Supabase로 동기화하는 가벼운 웹앱",
   "start_url": "./index.html",
   "display": "standalone",
