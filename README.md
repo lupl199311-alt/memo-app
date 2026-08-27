@@ -10,11 +10,15 @@
 
 할일 입력칸에는 여러 줄을 한 번에 붙여넣을 수 있습니다. 한 줄에 하나씩 적고 `추가`를 누르면 빈 줄은 건너뛰고 각각 별도의 할일로 만들어집니다.
 
+`AI 우선순위`를 누르면 현재 남은 할일을 보고 필요한 질문을 최대 3개만 물어본 뒤, 답변을 기준으로 오늘 먼저/오늘 다음/일정 잡기/연락·대기/나중으로 자동 배정합니다.
+
 Supabase Project URL과 anon/public key는 앱 코드에 들어 있습니다. `service_role` key는 절대 브라우저나 GitHub에 넣지 않습니다.
 
 ## Supabase 초기 설정
 
 Supabase 프로젝트를 새로 만들 때는 SQL Editor에서 `supabase/schema.sql` 내용을 한 번 실행합니다.
+
+AI 우선순위를 쓰려면 Supabase Edge Function `prioritize-todos`를 배포하고, Supabase Dashboard의 Edge Function Secrets에 `OPENAI_API_KEY`를 추가합니다. OpenAI 키는 브라우저 코드나 GitHub에 넣지 않습니다. 선택 사항으로 `OPENAI_MODEL`을 넣으면 기본 모델을 바꿀 수 있으며, 기본값은 `gpt-5-mini`입니다.
 
 ## 로컬 실행
 
