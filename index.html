@@ -328,32 +328,57 @@
       display: grid;
       gap: 6px;
       margin: 0;
-      padding-left: 20px;
-      color: var(--grey-800);
-      line-height: 1.45;
+      padding: 0;
+      list-style: none;
     }
 
     .priority-questions:empty {
       display: none;
     }
 
-    .priority-answer {
-      width: 100%;
-      min-height: 88px;
-      padding: 12px 14px;
+    .priority-question {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
       border: 1px solid var(--grey-200);
       border-radius: 8px;
       background: #fff;
-      color: var(--grey-900);
-      outline: none;
-      resize: vertical;
-      line-height: 1.5;
-      transition: border-color 140ms ease, box-shadow 140ms ease;
     }
 
-    .priority-answer:focus {
+    .priority-question-title {
+      color: var(--grey-800);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .priority-choice-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .priority-choice {
+      min-height: 36px;
+      max-width: 100%;
+      padding: 6px 10px;
+      border: 1px solid var(--grey-200);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--grey-800);
+      font-size: 13px;
+      line-height: 1.25;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+
+    .priority-choice:hover {
+      background: var(--grey-50);
+    }
+
+    .priority-choice.selected {
       border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.16);
+      background: #eff6ff;
+      color: #1d4ed8;
     }
 
     .priority-actions {
@@ -384,7 +409,7 @@
 
     .todo-item {
       display: grid;
-      grid-template-columns: auto 1fr auto auto;
+      grid-template-columns: auto 1fr auto auto auto auto;
       gap: 10px;
       align-items: center;
       min-height: 48px;
@@ -485,6 +510,27 @@
 
     .focus-btn {
       color: var(--blue);
+    }
+
+    .ai-priority-button {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .todo-rank {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid #93c5fd;
+      background: #eff6ff;
+      color: var(--blue);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
     }
 
     .memo-actions {
@@ -625,7 +671,6 @@
             <span class="muted" id="todoCount">0개 남음</span>
           </div>
           <div class="todo-tools">
-            <button class="btn" id="prioritizeTodos" type="button">AI 우선순위</button>
             <button class="btn" id="clearDone" type="button">완료 정리</button>
           </div>
         </div>
@@ -639,16 +684,15 @@
           <div class="priority-head">
             <div>
               <strong class="priority-title">AI 우선순위</strong>
-              <p class="priority-copy">최대 3개만 물어보고 오늘 할 순서로 정리합니다.</p>
+              <p class="priority-copy">세 질문에 해당하는 할 일만 버튼으로 골라주세요.</p>
             </div>
             <button class="icon-btn" id="closePriority" type="button" aria-label="AI 우선순위 닫기">×</button>
           </div>
-          <span class="priority-status" id="priorityStatus">할일을 보고 질문을 만들게요.</span>
-          <ol class="priority-questions" id="priorityQuestions"></ol>
-          <textarea class="priority-answer" id="priorityAnswers" placeholder="마감, 중요도, 지금 컨디션 같은 답을 짧게 적어주세요"></textarea>
+          <span class="priority-status" id="priorityStatus">해당하는 할 일을 눌러주세요.</span>
+          <div class="priority-questions" id="priorityQuestions"></div>
           <div class="priority-actions">
-            <button class="btn" id="askPriority" type="button">질문 다시 받기</button>
-            <button class="btn primary" id="applyPriority" type="button">답변 보내고 배정</button>
+            <button class="btn" id="askPriority" type="button">다시 고르기</button>
+            <button class="btn primary" id="applyPriority" type="button" disabled>이 순서로 배정</button>
           </div>
         </div>
 
@@ -687,6 +731,9 @@
     let isSaving = false;
     let supabaseClient = null;
     let currentUser = null;
+    let priorityQuestionsData = [];
+    let prioritySelections = new Map();
+    let priorityTargetId = "";
 
     const timerEl = document.getElementById("timer");
     const progressBar = document.getElementById("progressBar");
@@ -712,11 +759,9 @@
     const todoEmpty = document.getElementById("todoEmpty");
     const todoCount = document.getElementById("todoCount");
     const clearDone = document.getElementById("clearDone");
-    const prioritizeButton = document.getElementById("prioritizeTodos");
     const priorityPanel = document.getElementById("priorityPanel");
     const priorityStatus = document.getElementById("priorityStatus");
     const priorityQuestions = document.getElementById("priorityQuestions");
-    const priorityAnswers = document.getElementById("priorityAnswers");
     const askPriority = document.getElementById("askPriority");
     const applyPriority = document.getElementById("applyPriority");
     const closePriority = document.getElementById("closePriority");
@@ -1057,7 +1102,13 @@
     }
 
     function renderTodos() {
+      sortTodosForDisplay();
       todoList.innerHTML = "";
+      const assignedTodoRanks = new Map(
+        state.todos
+          .filter((todo) => !todo.done && todo.priority && priorityLabels[todo.priority])
+          .map((todo, index) => [String(todo.id), index + 1])
+      );
       state.todos.forEach((todo) => {
         const li = document.createElement("li");
         li.className = `todo-item${todo.done ? " done" : ""}${todo.id === state.activeTodoId ? " active" : ""}`;
@@ -1093,6 +1144,25 @@
           copy.append(priority);
         }
 
+        const ai = document.createElement("button");
+        ai.type = "button";
+        ai.className = "icon-btn ai-priority-button";
+        ai.title = "AI로 이 할 일의 우선순위 정리";
+        ai.ariaLabel = `${todo.text} AI 우선순위 질문 열기`;
+        ai.textContent = "AI";
+        ai.addEventListener("click", () => requestPriorityQuestions(todo.id));
+
+        const rank = assignedTodoRanks.get(String(todo.id));
+        const order = document.createElement("span");
+        if (rank) {
+          order.className = "todo-rank";
+          order.title = `현재 실행 순서 ${rank}순위`;
+          order.ariaLabel = `현재 실행 순서 ${rank}순위`;
+          order.textContent = String(rank);
+        } else {
+          order.hidden = true;
+        }
+
         const focus = document.createElement("button");
         focus.type = "button";
         focus.className = "icon-btn focus-btn";
@@ -1117,7 +1187,7 @@
           renderAll();
         });
 
-        li.append(checkbox, copy, focus, remove);
+        li.append(checkbox, copy, order, ai, focus, remove);
         todoList.append(li);
       });
 
@@ -1128,23 +1198,104 @@
     }
 
     function setPriorityBusy(isBusy) {
-      prioritizeButton.disabled = isBusy;
+      document.querySelectorAll(".ai-priority-button").forEach((button) => {
+        button.disabled = isBusy;
+        button.title = isBusy ? "AI가 우선순위를 정리하고 있어요" : "AI로 이 할 일의 우선순위 정리";
+      });
       askPriority.disabled = isBusy;
-      applyPriority.disabled = isBusy;
-      prioritizeButton.textContent = isBusy ? "AI 정리 중" : "AI 우선순위";
+      applyPriority.disabled = isBusy || !hasPrioritySelections();
     }
 
     function setPriorityStatus(text) {
       priorityStatus.textContent = text;
     }
 
+    const priorityQuestionTemplates = [
+      {
+        id: "category",
+        title: "이 할 일은 어디에 가까워?",
+        options: [
+          { value: "revenue", label: "일 따오기" },
+          { value: "money", label: "돈 관리" },
+          { value: "schedule", label: "일정 조율" },
+          { value: "internal", label: "내부 업무" }
+        ]
+      },
+      {
+        id: "deadline",
+        title: "언제까지 해야 해?",
+        options: [
+          { value: "today", label: "오늘" },
+          { value: "tomorrow", label: "내일" },
+          { value: "week", label: "이번 주" },
+          { value: "none", label: "기한 없음" }
+        ]
+      },
+      {
+        id: "impact",
+        title: "미루면 어떻게 돼?",
+        options: [
+          { value: "revenue", label: "매출·계약 기회 놓침" },
+          { value: "money", label: "돈·마감에 영향" },
+          { value: "waiting", label: "누군가 기다림" },
+          { value: "blocked", label: "다음 일 막힘" },
+          { value: "later", label: "미뤄도 됨" }
+        ]
+      }
+    ];
+
+    function buildPriorityQuestions() {
+      return priorityQuestionTemplates;
+    }
+
+    function hasPrioritySelections() {
+      return priorityQuestionsData.length > 0
+        && priorityQuestionsData.every((question) => Boolean(prioritySelections.get(question.id)));
+    }
+
+    function updatePriorityActionState() {
+      applyPriority.disabled = !hasPrioritySelections();
+    }
+
     function renderPriorityQuestions(questions) {
       priorityQuestions.innerHTML = "";
       questions.forEach((question) => {
-        const item = document.createElement("li");
-        item.textContent = question;
+        const item = document.createElement("section");
+        item.className = "priority-question";
+
+        const title = document.createElement("strong");
+        title.className = "priority-question-title";
+        title.textContent = question.title;
+
+        const choices = document.createElement("div");
+        choices.className = "priority-choice-list";
+        const selectedValue = prioritySelections.get(question.id) || "";
+
+        question.options.forEach((option) => {
+          const choice = document.createElement("button");
+          choice.type = "button";
+          choice.className = "priority-choice";
+          choice.dataset.questionId = question.id;
+          choice.dataset.optionValue = option.value;
+          choice.textContent = option.label;
+          choice.setAttribute("aria-pressed", String(selectedValue === option.value));
+          if (selectedValue === option.value) choice.classList.add("selected");
+          choice.addEventListener("click", () => {
+            prioritySelections.set(question.id, option.value);
+            choices.querySelectorAll(".priority-choice").forEach((button) => {
+              const isSelected = option.value === button.dataset.optionValue;
+              button.classList.toggle("selected", isSelected);
+              button.setAttribute("aria-pressed", String(isSelected));
+            });
+            updatePriorityActionState();
+          });
+          choices.append(choice);
+        });
+
+        item.append(title, choices);
         priorityQuestions.append(item);
       });
+      updatePriorityActionState();
     }
 
     function getOpenTodoPayload() {
@@ -1186,8 +1337,8 @@
       return error?.message || "AI 우선순위 함수 호출에 실패했어요.";
     }
 
-    async function invokePriority(mode, answers = "") {
-      const todos = getOpenTodoPayload();
+    async function invokePriority(mode, answers = "", todosOverride = null) {
+      const todos = todosOverride || getOpenTodoPayload();
       if (todos.length === 0) {
         throw new Error("아직 배정할 할일이 없어요.");
       }
@@ -1217,27 +1368,17 @@
       return message || "AI 우선순위 정리에 실패했어요.";
     }
 
-    async function requestPriorityQuestions() {
+    async function requestPriorityQuestions(todoId) {
+      const target = state.todos.find((todo) => String(todo.id) === String(todoId) && !todo.done);
       priorityPanel.classList.remove("hidden");
-      renderPriorityQuestions([]);
-      setPriorityStatus("할일을 읽는 중입니다.");
-      setPriorityBusy(true);
-
-      try {
-        const data = await invokePriority("questions");
-        const questions = Array.isArray(data.questions)
-          ? data.questions.filter(Boolean).slice(0, 3)
-          : [];
-        renderPriorityQuestions(questions);
-        setPriorityStatus(questions.length
-          ? "이것만 알려주면 바로 배정할게요."
-          : "질문 없이 바로 배정해도 괜찮아요.");
-        priorityAnswers.focus();
-      } catch (error) {
-        setPriorityStatus(explainPriorityError(error));
-      } finally {
-        setPriorityBusy(false);
-      }
+      priorityTargetId = target ? String(target.id) : "";
+      priorityQuestionsData = buildPriorityQuestions();
+      prioritySelections = new Map(priorityQuestionsData.map((question) => [question.id, ""]));
+      renderPriorityQuestions(priorityQuestionsData);
+      setPriorityStatus(target
+        ? `"${target.text}"에 대해 하나씩 골라주세요.`
+        : "아직 배정할 할일이 없어요.");
+      setPriorityBusy(false);
     }
 
     function getTodoSortValue(todo) {
@@ -1247,8 +1388,18 @@
       return [0, bucket, rank];
     }
 
-    function applyPriorityAssignments(items) {
-      const allowedIds = new Set(getOpenTodoPayload().map((todo) => todo.id));
+    function sortTodosForDisplay() {
+      state.todos.sort((leftTodo, rightTodo) => {
+        const left = getTodoSortValue(leftTodo);
+        const right = getTodoSortValue(rightTodo);
+        return left[0] - right[0] || left[1] - right[1] || left[2] - right[2];
+      });
+    }
+
+    function applyPriorityAssignments(items, targetId = "") {
+      const allowedIds = new Set(targetId
+        ? [String(targetId)]
+        : getOpenTodoPayload().map((todo) => todo.id));
       const assignments = new Map();
 
       items.forEach((item) => {
@@ -1279,15 +1430,95 @@
       return assignments.size;
     }
 
+    function getSelectedPriorityValue(questionId) {
+      return prioritySelections.get(questionId) || "";
+    }
+
+    function buildLocalPriorityPlan() {
+      const todo = getOpenTodoPayload().find((item) => item.id === priorityTargetId);
+      if (!todo) return [];
+
+      const category = getSelectedPriorityValue("category");
+      const deadline = getSelectedPriorityValue("deadline");
+      const impact = getSelectedPriorityValue("impact");
+      const reasons = [];
+      let score = 0;
+
+      const categoryLabels = {
+        revenue: "일 따오기",
+        money: "돈 관리",
+        schedule: "일정 조율",
+        internal: "내부 업무"
+      };
+      const deadlineScores = { today: 100, tomorrow: 70, week: 40, none: 10 };
+      const impactScores = { revenue: 55, money: 55, waiting: 40, blocked: 35, later: 0 };
+
+      score += deadlineScores[deadline] || 0;
+      score += category === "money" ? 65 : category === "revenue" ? 55 : category === "schedule" ? 25 : 10;
+      score += impactScores[impact] || 0;
+      if (deadline === "today") reasons.push("오늘 마감");
+      if (categoryLabels[category]) reasons.push(categoryLabels[category]);
+      if (impact === "revenue" || impact === "money") reasons.push("돈과 연결");
+      if (impact === "waiting") reasons.push("누군가 기다림");
+      if (impact === "blocked") reasons.push("다음 일에 영향");
+
+      const priority = score >= 150
+        ? "today_first"
+        : score >= 80
+          ? "today_next"
+          : category === "schedule"
+            ? "schedule"
+            : impact === "waiting"
+              ? "delegate_or_wait"
+              : "later";
+
+      return [{
+        id: todo.id,
+        priority,
+        rank: 1,
+        reason: reasons.join(" · ") || "선택한 기준이 적어 뒤로 배정"
+      }];
+    }
+
+    function serializePriorityAnswers() {
+      return JSON.stringify(priorityQuestionsData.map((question) => ({
+        question: question.title,
+        selected: getSelectedPriorityValue(question.id)
+          ? [question.options.find((option) => option.value === getSelectedPriorityValue(question.id))?.label
+            || getSelectedPriorityValue(question.id)]
+          : []
+      })));
+    }
+
     async function applyPriorityPlan() {
       priorityPanel.classList.remove("hidden");
-      setPriorityStatus("답변 기준으로 순서를 잡는 중입니다.");
+      if (!hasPrioritySelections()) {
+        setPriorityStatus("세 질문 모두에서 하나씩 선택해주세요.");
+        return;
+      }
+
+      setPriorityStatus("선택한 기준으로 순서를 정리하는 중입니다.");
       setPriorityBusy(true);
 
       try {
-        const data = await invokePriority("prioritize", priorityAnswers.value.trim());
-        const items = Array.isArray(data.items) ? data.items : [];
-        const changed = applyPriorityAssignments(items);
+        let data = null;
+        const targetTodos = getOpenTodoPayload().filter((todo) => todo.id === priorityTargetId);
+        if (currentUser && targetTodos.length > 0) {
+          try {
+            data = await invokePriority("prioritize", serializePriorityAnswers(), targetTodos);
+          } catch {
+            data = null;
+          }
+        }
+        const usedLocalPlan = !Array.isArray(data?.items) || data.items.length === 0;
+        if (usedLocalPlan) {
+          data = {
+            summary: "선택한 기준으로 할 일을 정리했어요.",
+            items: buildLocalPriorityPlan()
+          };
+        }
+        const items = data.items;
+        const changed = applyPriorityAssignments(items, priorityTargetId);
         if (changed === 0) {
           throw new Error("AI가 배정값을 돌려주지 않았어요.");
         }
@@ -1441,8 +1672,7 @@
       renderTodos();
     });
 
-    prioritizeButton.addEventListener("click", requestPriorityQuestions);
-    askPriority.addEventListener("click", requestPriorityQuestions);
+    askPriority.addEventListener("click", () => requestPriorityQuestions(priorityTargetId));
     applyPriority.addEventListener("click", applyPriorityPlan);
     closePriority.addEventListener("click", () => priorityPanel.classList.add("hidden"));
 
