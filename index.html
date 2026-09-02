@@ -100,6 +100,23 @@
       color: var(--grey-900);
     }
 
+    .timer-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      text-align: left;
+    }
+
+    .timer-heading .timer-label {
+      margin: 0;
+    }
+
+    .timer-heading .sync-status {
+      margin-top: 0;
+      white-space: nowrap;
+    }
+
     .timer-controls, .memo-actions, .auth-actions, .priority-actions {
       display: flex;
       gap: 8px;
@@ -625,14 +642,16 @@
     <header class="topbar" aria-label="타이머">
       <section class="timer-panel">
         <div>
-          <p class="timer-label">오늘 집중 시간</p>
+          <div class="timer-heading">
+            <p class="timer-label">오늘 집중 시간</p>
+            <span class="sync-status offline" id="syncStatus"><span class="sync-dot"></span><span id="syncText">로컬 저장 중</span></span>
+          </div>
           <p class="timer-time" id="timer">00:00:00</p>
           <div class="active-task" id="activeTask">
             <span class="active-task-label">지금 할 일</span>
             <div class="active-task-text" id="activeTaskText"></div>
           </div>
           <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
-          <span class="sync-status offline" id="syncStatus"><span class="sync-dot"></span><span id="syncText">로컬 저장 중</span></span>
         </div>
         <div class="timer-controls" aria-label="타이머 조작">
           <button class="btn primary" id="toggleTimer" type="button">시작</button>
@@ -676,7 +695,7 @@
         </div>
 
         <form class="todo-form" id="todoForm">
-          <textarea class="todo-box" id="todoInput" autocomplete="off" placeholder="할일을 한 줄에 하나씩 적어주세요"></textarea>
+          <textarea class="todo-box" id="todoInput" autocomplete="off" placeholder="할 일을 적고 엔터를 누르세요"></textarea>
           <button class="btn primary" type="submit">추가</button>
         </form>
 
@@ -1660,7 +1679,7 @@
     });
 
     todoInput.addEventListener("keydown", (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         addTodos(todoInput.value);
       }
