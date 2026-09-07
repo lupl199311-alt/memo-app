@@ -1444,10 +1444,11 @@
     }
 
     function getTodoSortValue(todo) {
-      if (todo.done) return [1, 99, 9999];
+      if (todo.done) return [2, 99, 9999];
+      if (!todo.priority || !priorityLabels[todo.priority]) return [0, 0, 0];
       const bucket = priorityWeights[todo.priority] || 99;
       const rank = Number.isFinite(Number(todo.priorityRank)) ? Number(todo.priorityRank) : 9999;
-      return [0, bucket, rank];
+      return [1, bucket, rank];
     }
 
     function sortTodosForDisplay() {
