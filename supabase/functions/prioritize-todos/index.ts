@@ -128,7 +128,7 @@ function cleanText(value: unknown, maxLength: number): string {
 }
 
 async function callOpenAI(openAIKey: string, mode: Mode, todos: TodoInput[], answers: string) {
-  const model = Deno.env.get("OPENAI_MODEL") || "gpt-5-mini";
+  const model = Deno.env.get("OPENAI_MODEL") || "gpt-5.6-luna";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {

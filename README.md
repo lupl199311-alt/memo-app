@@ -18,7 +18,7 @@ Supabase Project URL과 anon/public key는 앱 코드에 들어 있습니다. `s
 
 Supabase 프로젝트를 새로 만들 때는 SQL Editor에서 `supabase/schema.sql` 내용을 한 번 실행합니다.
 
-AI 우선순위를 쓰려면 Supabase Edge Function `prioritize-todos`를 배포하고, Supabase Dashboard의 Edge Function Secrets에 `OPENAI_API_KEY`를 추가합니다. OpenAI 키는 브라우저 코드나 GitHub에 넣지 않습니다. 선택 사항으로 `OPENAI_MODEL`을 넣으면 기본 모델을 바꿀 수 있으며, 기본값은 `gpt-5-mini`입니다.
+AI 우선순위를 쓰려면 Supabase Edge Function `prioritize-todos`를 배포하고, Supabase Dashboard의 Edge Function Secrets에 `OPENAI_API_KEY`를 추가합니다. OpenAI 키는 브라우저 코드나 GitHub에 넣지 않습니다. 선택 사항으로 `OPENAI_MODEL`을 넣으면 기본 모델을 바꿀 수 있으며, 기본값은 비용이 더 낮은 `gpt-5.6-luna`입니다.
 
 ## 로컬 실행
 

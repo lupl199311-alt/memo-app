@@ -304,7 +304,8 @@
     .priority-panel {
       display: grid;
       gap: 10px;
-      margin-bottom: 12px;
+      grid-column: 1 / -1;
+      margin-top: 2px;
       padding: 12px;
       border: 1px solid #d7e3f5;
       border-radius: 8px;
@@ -699,22 +700,6 @@
           <button class="btn primary" type="submit">추가</button>
         </form>
 
-        <div class="priority-panel hidden" id="priorityPanel" aria-live="polite">
-          <div class="priority-head">
-            <div>
-              <strong class="priority-title">AI 우선순위</strong>
-              <p class="priority-copy">세 질문에 해당하는 할 일만 버튼으로 골라주세요.</p>
-            </div>
-            <button class="icon-btn" id="closePriority" type="button" aria-label="AI 우선순위 닫기">×</button>
-          </div>
-          <span class="priority-status" id="priorityStatus">해당하는 할 일을 눌러주세요.</span>
-          <div class="priority-questions" id="priorityQuestions"></div>
-          <div class="priority-actions">
-            <button class="btn" id="askPriority" type="button">다시 고르기</button>
-            <button class="btn primary" id="applyPriority" type="button" disabled>이 순서로 배정</button>
-          </div>
-        </div>
-
         <ul class="todo-list" id="todoList"></ul>
         <div class="empty" id="todoEmpty">체크할 일이 아직 없어요.</div>
       </section>
@@ -753,6 +738,7 @@
     let priorityQuestionsData = [];
     let prioritySelections = new Map();
     let priorityTargetId = "";
+    let priorityIsBusy = false;
 
     const timerEl = document.getElementById("timer");
     const progressBar = document.getElementById("progressBar");
@@ -778,12 +764,6 @@
     const todoEmpty = document.getElementById("todoEmpty");
     const todoCount = document.getElementById("todoCount");
     const clearDone = document.getElementById("clearDone");
-    const priorityPanel = document.getElementById("priorityPanel");
-    const priorityStatus = document.getElementById("priorityStatus");
-    const priorityQuestions = document.getElementById("priorityQuestions");
-    const askPriority = document.getElementById("askPriority");
-    const applyPriority = document.getElementById("applyPriority");
-    const closePriority = document.getElementById("closePriority");
     const memoInput = document.getElementById("memoInput");
     const saveMemo = document.getElementById("saveMemo");
     const clearMemo = document.getElementById("clearMemo");
@@ -1207,6 +1187,9 @@
         });
 
         li.append(checkbox, copy, order, ai, focus, remove);
+        if (!todo.done && String(todo.id) === priorityTargetId) {
+          li.append(createPriorityPanel(todo));
+        }
         todoList.append(li);
       });
 
@@ -1217,16 +1200,25 @@
     }
 
     function setPriorityBusy(isBusy) {
+      priorityIsBusy = isBusy;
       document.querySelectorAll(".ai-priority-button").forEach((button) => {
         button.disabled = isBusy;
         button.title = isBusy ? "AI가 우선순위를 정리하고 있어요" : "AI로 이 할 일의 우선순위 정리";
       });
-      askPriority.disabled = isBusy;
-      applyPriority.disabled = isBusy || !hasPrioritySelections();
+      const panel = getPriorityPanel();
+      panel?.querySelectorAll(".priority-choice, .priority-reset-button").forEach((button) => {
+        button.disabled = isBusy;
+      });
+    }
+
+    function getPriorityPanel() {
+      return [...todoList.querySelectorAll(".priority-panel")]
+        .find((panel) => panel.dataset.todoId === priorityTargetId) || null;
     }
 
     function setPriorityStatus(text) {
-      priorityStatus.textContent = text;
+      const panel = getPriorityPanel();
+      if (panel) panel.querySelector(".priority-status").textContent = text;
     }
 
     const priorityQuestionTemplates = [
@@ -1272,12 +1264,8 @@
         && priorityQuestionsData.every((question) => Boolean(prioritySelections.get(question.id)));
     }
 
-    function updatePriorityActionState() {
-      applyPriority.disabled = !hasPrioritySelections();
-    }
-
-    function renderPriorityQuestions(questions) {
-      priorityQuestions.innerHTML = "";
+    function renderPriorityQuestions(questions, container) {
+      container.innerHTML = "";
       questions.forEach((question) => {
         const item = document.createElement("section");
         item.className = "priority-question";
@@ -1306,15 +1294,73 @@
               button.classList.toggle("selected", isSelected);
               button.setAttribute("aria-pressed", String(isSelected));
             });
-            updatePriorityActionState();
+            if (hasPrioritySelections()) {
+              void applyPriorityPlan();
+            } else {
+              setPriorityStatus("세 질문을 모두 고르면 자동으로 정리합니다.");
+            }
           });
           choices.append(choice);
         });
 
         item.append(title, choices);
-        priorityQuestions.append(item);
+        container.append(item);
       });
-      updatePriorityActionState();
+    }
+
+    function createPriorityPanel(todo) {
+      const panel = document.createElement("div");
+      panel.className = "priority-panel";
+      panel.dataset.todoId = String(todo.id);
+      panel.setAttribute("aria-live", "polite");
+
+      const head = document.createElement("div");
+      head.className = "priority-head";
+
+      const heading = document.createElement("div");
+      const title = document.createElement("strong");
+      title.className = "priority-title";
+      title.textContent = "AI 우선순위";
+      const copy = document.createElement("p");
+      copy.className = "priority-copy";
+      copy.textContent = "세 질문을 모두 고르면 자동으로 정리합니다.";
+      heading.append(title, copy);
+
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "icon-btn";
+      close.ariaLabel = "AI 우선순위 닫기";
+      close.textContent = "×";
+      close.addEventListener("click", closePriorityPanel);
+      head.append(heading, close);
+
+      const status = document.createElement("span");
+      status.className = "priority-status";
+      status.textContent = `"${todo.text}"에 대해 하나씩 골라주세요.`;
+
+      const questions = document.createElement("div");
+      questions.className = "priority-questions";
+      renderPriorityQuestions(priorityQuestionsData, questions);
+
+      const actions = document.createElement("div");
+      actions.className = "priority-actions";
+      const reset = document.createElement("button");
+      reset.type = "button";
+      reset.className = "btn priority-reset-button";
+      reset.textContent = "다시 고르기";
+      reset.addEventListener("click", () => requestPriorityQuestions(todo.id));
+      actions.append(reset);
+
+      panel.append(head, status, questions, actions);
+      return panel;
+    }
+
+    function closePriorityPanel() {
+      priorityTargetId = "";
+      priorityQuestionsData = [];
+      prioritySelections = new Map();
+      priorityIsBusy = false;
+      renderTodos();
     }
 
     function getOpenTodoPayload() {
@@ -1389,14 +1435,11 @@
 
     async function requestPriorityQuestions(todoId) {
       const target = state.todos.find((todo) => String(todo.id) === String(todoId) && !todo.done);
-      priorityPanel.classList.remove("hidden");
       priorityTargetId = target ? String(target.id) : "";
       priorityQuestionsData = buildPriorityQuestions();
       prioritySelections = new Map(priorityQuestionsData.map((question) => [question.id, ""]));
-      renderPriorityQuestions(priorityQuestionsData);
-      setPriorityStatus(target
-        ? `"${target.text}"에 대해 하나씩 골라주세요.`
-        : "아직 배정할 할일이 없어요.");
+      renderTodos();
+      setPriorityStatus(target ? `"${target.text}"에 대해 하나씩 골라주세요.` : "아직 배정할 할일이 없어요.");
       setPriorityBusy(false);
     }
 
@@ -1510,7 +1553,7 @@
     }
 
     async function applyPriorityPlan() {
-      priorityPanel.classList.remove("hidden");
+      if (priorityIsBusy) return;
       if (!hasPrioritySelections()) {
         setPriorityStatus("세 질문 모두에서 하나씩 선택해주세요.");
         return;
@@ -1542,8 +1585,10 @@
           throw new Error("AI가 배정값을 돌려주지 않았어요.");
         }
         await persistState();
+        priorityTargetId = "";
+        priorityQuestionsData = [];
+        prioritySelections = new Map();
         renderAll();
-        setPriorityStatus(data.summary || `${changed}개 할일을 우선순위대로 정리했어요.`);
       } catch (error) {
         setPriorityStatus(explainPriorityError(error));
       } finally {
@@ -1690,10 +1735,6 @@
       persistState();
       renderTodos();
     });
-
-    askPriority.addEventListener("click", () => requestPriorityQuestions(priorityTargetId));
-    applyPriority.addEventListener("click", applyPriorityPlan);
-    closePriority.addEventListener("click", () => priorityPanel.classList.add("hidden"));
 
     saveMemo.addEventListener("click", () => addMemo(memoInput.value));
     clearMemo.addEventListener("click", () => {
