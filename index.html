@@ -37,13 +37,14 @@
 
     body {
       margin: 0;
-      min-height: 100vh;
+      min-height: 100svh;
       background:
         radial-gradient(circle at 12% 0%, rgba(49, 130, 246, 0.09), transparent 28rem),
         linear-gradient(180deg, #ffffff 0%, var(--grey-50) 100%);
       color: var(--grey-900);
       font-weight: 400;
       letter-spacing: 0;
+      padding-bottom: env(safe-area-inset-bottom);
     }
 
     button, input, textarea {
@@ -609,7 +610,7 @@
 
     @media (max-width: 780px) {
       .app {
-        padding: 12px;
+        padding: 10px 12px calc(22px + env(safe-area-inset-bottom));
       }
 
       .timer-panel, .layout {
@@ -634,6 +635,204 @@
 
       .todo-tools .btn, .priority-actions .btn {
         flex: 1 1 130px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .topbar {
+        padding: 4px 0 12px;
+      }
+
+      .timer-panel {
+        gap: 12px;
+        padding: 16px 14px;
+        border-radius: 16px;
+      }
+
+      .timer-heading {
+        gap: 6px;
+      }
+
+      .timer-heading .sync-status {
+        font-size: 12px;
+      }
+
+      .timer-time {
+        font-size: clamp(44px, 14vw, 60px);
+      }
+
+      .timer-controls {
+        flex-wrap: nowrap;
+        gap: 6px;
+      }
+
+      .timer-controls .btn {
+        min-width: 0;
+        flex: 1 1 0;
+        padding: 0 8px;
+        font-size: 14px;
+      }
+
+      .layout {
+        gap: 12px;
+      }
+
+      .section, .sync-panel {
+        padding: 16px 12px;
+        border-radius: 16px;
+      }
+
+      .section-head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .section-head h1 {
+        font-size: 20px;
+      }
+
+      .todo-tools {
+        width: 100%;
+      }
+
+      .todo-tools .btn {
+        min-width: 0;
+        flex: 1 1 0;
+        padding: 0 8px;
+        font-size: 13px;
+      }
+
+      .todo-item {
+        grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+        grid-template-areas:
+          "check copy copy copy copy"
+          "check rank ai focus delete";
+        align-items: start;
+        gap: 8px 10px;
+        min-height: 0;
+        padding: 14px 12px;
+        border-radius: 14px;
+      }
+
+      .todo-item > input {
+        grid-area: check;
+        margin-top: 2px;
+      }
+
+      .todo-copy {
+        grid-area: copy;
+        gap: 6px;
+        padding-top: 1px;
+      }
+
+      .todo-text {
+        font-size: 16px;
+        line-height: 1.45;
+      }
+
+      .todo-priority {
+        padding: 4px 8px;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .todo-rank {
+        grid-area: rank;
+        justify-self: start;
+        width: 38px;
+        height: 38px;
+        font-size: 13px;
+      }
+
+      .ai-priority-button {
+        grid-area: ai;
+      }
+
+      .focus-btn {
+        grid-area: focus;
+      }
+
+      .todo-item > .icon-btn:last-child {
+        grid-area: delete;
+      }
+
+      .todo-item > .icon-btn,
+      .todo-item > .todo-rank {
+        width: 38px;
+        height: 38px;
+      }
+
+      .priority-panel {
+        grid-column: 1 / -1;
+        margin-top: 4px;
+        padding: 12px 10px;
+        border-radius: 12px;
+      }
+
+      .priority-question {
+        padding: 10px 8px;
+        border-radius: 10px;
+      }
+
+      .priority-choice-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .priority-choice {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 7px 8px;
+        font-size: 12px;
+        text-align: center;
+      }
+
+      .priority-actions {
+        gap: 6px;
+      }
+
+      .priority-actions .btn {
+        min-width: 0;
+        flex: 1 1 0;
+        padding: 0 8px;
+        font-size: 13px;
+      }
+
+      .memo-box {
+        min-height: 140px;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .app {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+
+      .todo-item {
+        gap: 8px;
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      .todo-item > .icon-btn,
+      .todo-item > .todo-rank {
+        width: 34px;
+        height: 34px;
+      }
+
+      .todo-item input {
+        width: 18px;
+        height: 18px;
+      }
+
+      .timer-time {
+        font-size: 42px;
       }
     }
   </style>
