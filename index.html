@@ -1870,6 +1870,27 @@
       renderTodos();
     }
 
+    function takeIncomingTodoText() {
+      const params = new URLSearchParams(location.search);
+      const incomingText = params.get("todo") || "";
+      if (!incomingText.trim()) return "";
+
+      // 텍스트가 주소창이나 브라우저 기록에 계속 남지 않도록 한 번 읽은 뒤 제거합니다.
+      history.replaceState(history.state, document.title, `${location.pathname}${location.hash}`);
+      return incomingText;
+    }
+
+    async function initializeApp() {
+      state = loadLocalState();
+      renderAll();
+
+      // 먼저 클라우드 상태를 불러온 뒤 URL로 들어온 내용을 추가해야
+      // Supabase 동기화가 새 할 일을 덮어쓰지 않습니다.
+      const incomingText = takeIncomingTodoText();
+      await initializeSupabase();
+      if (incomingText) addTodos(incomingText);
+    }
+
     function addMemo(text) {
       const trimmed = text.trim();
       if (!trimmed) return;
@@ -1958,12 +1979,7 @@
       navigator.serviceWorker.register("sw.js");
     }
 
-    state = loadLocalState();
-    renderAll();
-
-    window.addEventListener("load", () => {
-      initializeSupabase();
-    });
+    window.addEventListener("load", initializeApp);
   </script>
 </body>
 </html>
