@@ -731,8 +731,8 @@
       .todo-item {
         grid-template-columns: auto minmax(0, 1fr) auto auto auto;
         grid-template-areas:
-          "check copy copy copy copy"
-          "check rank ai focus delete";
+          "check copy copy copy rank"
+          "check ai focus . delete";
         align-items: start;
         gap: 8px 10px;
         min-height: 0;
@@ -762,7 +762,8 @@
 
       .todo-rank {
         grid-area: rank;
-        justify-self: start;
+        justify-self: center;
+        align-self: start;
         width: 38px;
         height: 38px;
         font-size: 13px;
