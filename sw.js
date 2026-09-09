@@ -1,4 +1,4 @@
-const CACHE_NAME = "luplmemo-v6";
+const CACHE_NAME = "luplmemo-v7";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
