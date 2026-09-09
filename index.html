@@ -552,6 +552,30 @@
       white-space: nowrap;
     }
 
+    .todo-rank.rank-red {
+      border-color: #fecdd3;
+      background: #fff1f2;
+      color: #d73a49;
+    }
+
+    .todo-rank.rank-orange {
+      border-color: #fed7aa;
+      background: #fff7ed;
+      color: #c26a00;
+    }
+
+    .todo-rank.rank-blue {
+      border-color: #bfdbfe;
+      background: #eff6ff;
+      color: #2473d4;
+    }
+
+    .todo-rank.rank-muted {
+      border-color: var(--grey-200);
+      background: var(--grey-100);
+      color: var(--grey-500);
+    }
+
     .memo-actions {
       justify-content: flex-end;
       margin-top: 10px;
@@ -733,9 +757,7 @@
       }
 
       .todo-priority {
-        padding: 4px 8px;
-        font-size: 12px;
-        line-height: 1.45;
+        display: none;
       }
 
       .todo-rank {
@@ -762,6 +784,13 @@
       .todo-item > .todo-rank {
         width: 38px;
         height: 38px;
+      }
+
+      .todo-item > .todo-rank {
+        width: 22px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
       }
 
       .priority-panel {
@@ -824,6 +853,10 @@
       .todo-item > .todo-rank {
         width: 34px;
         height: 34px;
+      }
+
+      .todo-item > .todo-rank {
+        width: 22px;
       }
 
       .todo-item input {
@@ -1353,7 +1386,7 @@
         const rank = assignedTodoRanks.get(String(todo.id));
         const order = document.createElement("span");
         if (rank) {
-          order.className = "todo-rank";
+          order.className = `todo-rank ${getRankTone(rank)}`;
           order.title = `현재 실행 순서 ${rank}순위`;
           order.ariaLabel = `현재 실행 순서 ${rank}순위`;
           order.textContent = String(rank);
@@ -1640,6 +1673,13 @@
       renderTodos();
       setPriorityStatus(target ? `"${target.text}"에 대해 하나씩 골라주세요.` : "아직 배정할 할일이 없어요.");
       setPriorityBusy(false);
+    }
+
+    function getRankTone(rank) {
+      if (rank <= 5) return "rank-red";
+      if (rank <= 10) return "rank-orange";
+      if (rank <= 15) return "rank-blue";
+      return "rank-muted";
     }
 
     function getTodoSortValue(todo) {
