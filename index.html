@@ -578,6 +578,37 @@
       font-weight: 700;
     }
 
+    .todo-ai-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .todo-calendar-button {
+      color: var(--blue);
+      font-size: 16px;
+    }
+
+    .todo-date-picker {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      border: 0;
+      opacity: 0;
+      pointer-events: none;
+      clip: rect(0 0 0 0);
+    }
+
+    .todo-rank-group {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      min-width: 0;
+    }
+
     .todo-rank {
       width: 34px;
       height: 34px;
@@ -820,16 +851,39 @@
       }
 
       .todo-rank {
-        grid-area: rank;
-        justify-self: center;
-        align-self: start;
         width: 38px;
         height: 38px;
         font-size: 13px;
       }
 
-      .ai-priority-button {
+      .todo-rank-group {
+        grid-area: rank;
+        justify-self: end;
+        align-self: start;
+      }
+
+      .todo-rank-group .todo-rank {
+        width: 22px;
+        height: 38px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .todo-rank-group .todo-due {
+        padding: 2px 6px;
+        font-size: 11px;
+      }
+
+      .todo-ai-group {
         grid-area: ai;
+        gap: 2px;
+        justify-content: flex-end;
+      }
+
+      .todo-ai-group .icon-btn {
+        width: 34px;
+        height: 38px;
       }
 
       .focus-btn {
@@ -840,17 +894,9 @@
         grid-area: delete;
       }
 
-      .todo-item > .icon-btn,
-      .todo-item > .todo-rank {
+      .todo-item > .icon-btn {
         width: 38px;
         height: 38px;
-      }
-
-      .todo-item > .todo-rank {
-        width: 22px;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
       }
 
       .priority-panel {
@@ -909,14 +955,19 @@
         padding-right: 10px;
       }
 
-      .todo-item > .icon-btn,
-      .todo-item > .todo-rank {
+      .todo-item > .icon-btn {
         width: 34px;
         height: 34px;
       }
 
-      .todo-item > .todo-rank {
+      .todo-ai-group .icon-btn {
+        width: 32px;
+        height: 34px;
+      }
+
+      .todo-rank-group .todo-rank {
         width: 22px;
+        height: 34px;
       }
 
       .todo-item input {
@@ -1402,7 +1453,7 @@
       todoList.innerHTML = "";
       const assignedTodoRanks = new Map(
         state.todos
-          .filter((todo) => !todo.done && !getValidTodoDate(todo.dueDate) && todo.priority && priorityLabels[todo.priority])
+          .filter((todo) => !todo.done && todo.priority && priorityLabels[todo.priority])
           .map((todo, index) => [String(todo.id), index + 1])
       );
       state.todos.forEach((todo) => {
@@ -1433,13 +1484,6 @@
         copy.append(text);
 
         const dueDate = getValidTodoDate(todo.dueDate);
-        if (dueDate) {
-          const due = document.createElement("span");
-          const dueOffset = getTodoDueOffset(dueDate);
-          due.className = `todo-due${dueOffset <= 0 ? " urgent" : ""}`;
-          due.textContent = formatTodoDue(dueDate);
-          copy.append(due);
-        }
 
         if (todo.priority && priorityLabels[todo.priority]) {
           const priority = document.createElement("span");
@@ -1457,16 +1501,59 @@
         ai.textContent = "AI";
         ai.addEventListener("click", () => requestPriorityQuestions(todo.id));
 
+        const calendar = document.createElement("button");
+        calendar.type = "button";
+        calendar.className = "icon-btn todo-calendar-button";
+        calendar.title = dueDate ? `기한 변경 (${formatTodoDue(dueDate)})` : "기한 날짜 추가";
+        calendar.ariaLabel = dueDate ? `${todo.text} 기한 변경` : `${todo.text} 기한 날짜 추가`;
+        calendar.textContent = "📅";
+
+        const datePicker = document.createElement("input");
+        datePicker.type = "date";
+        datePicker.className = "todo-date-picker";
+        datePicker.value = dueDate;
+        datePicker.tabIndex = -1;
+        datePicker.ariaLabel = `${todo.text} 기한 날짜`;
+        datePicker.addEventListener("change", () => {
+          todo.dueDate = getValidTodoDate(datePicker.value);
+          persistState();
+          renderAll();
+        });
+        calendar.addEventListener("click", () => {
+          try {
+            if (typeof datePicker.showPicker === "function") {
+              datePicker.showPicker();
+              return;
+            }
+          } catch {
+            // 일부 모바일 브라우저는 showPicker를 지원하지 않아 click으로 엽니다.
+          }
+          datePicker.click();
+        });
+
+        const aiGroup = document.createElement("div");
+        aiGroup.className = "todo-ai-group";
+        aiGroup.append(ai, calendar, datePicker);
+
         const rank = assignedTodoRanks.get(String(todo.id));
-        const order = document.createElement("span");
+        const rankGroup = document.createElement("span");
+        rankGroup.className = "todo-rank-group";
         if (rank) {
+          const order = document.createElement("span");
           order.className = `todo-rank ${getRankTone(rank)}`;
           order.title = `현재 실행 순서 ${rank}순위`;
           order.ariaLabel = `현재 실행 순서 ${rank}순위`;
           order.textContent = String(rank);
-        } else {
-          order.hidden = true;
+          rankGroup.append(order);
         }
+        if (dueDate) {
+          const due = document.createElement("span");
+          const dueOffset = getTodoDueOffset(dueDate);
+          due.className = `todo-due${dueOffset <= 0 ? " urgent" : ""}`;
+          due.textContent = formatTodoDue(dueDate);
+          rankGroup.append(due);
+        }
+        rankGroup.hidden = !rank && !dueDate;
 
         const focus = document.createElement("button");
         focus.type = "button";
@@ -1492,7 +1579,7 @@
           renderAll();
         });
 
-        li.append(checkbox, copy, order, ai, focus, remove);
+        li.append(checkbox, copy, rankGroup, aiGroup, focus, remove);
         if (!todo.done && String(todo.id) === priorityTargetId) {
           li.append(createPriorityPanel(todo));
         }
